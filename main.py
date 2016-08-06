@@ -5,6 +5,7 @@ import time
 import json
 import requests
 import calendar
+import ast
 
 class Firebase(object):
     def __init__(self, url):
@@ -14,20 +15,65 @@ class Firebase(object):
         return Firebase(self.url + url)
 
     def get(self, url = ''):
-        return requests.get(self.url + url + '.json')
+        json = requests.get(self.url + url + '.json').text
+
+        try:
+            print(self.url + url, json)
+
+            if json == 'null':
+                return None
+            return ast.literal_eval(json)
+        except ValueError:
+            raise
+
+    def delete(self, url = ''):
+        return requests.delete(self.url + url + '.json')
 
     def update(self, payload, url = ''):
-        return requests.patch(self.url + url + '.json', data=json.dumps(payload))
+        return ast.literal_eval(requests.patch(self.url + url + '.json', data=json.dumps(payload)).text)
 
 bot_id = sys.argv[1]
 
-url = '/bots/{}'.format(bot_id)
+if not bot_id:
+    print('failed to get bot_if, exitting...')
+    sys.exit(1)
 
-ref = Firebase('https://meowth-aed86.firebaseio.com/')
+bot_ref = Firebase('https://meowth-aed86.firebaseio.com/bots/{}/'.format(bot_id))
+# get bot object
+bot = bot_ref.get()
 
-for i in range(12):
-    response = ref.update({ 'status': 'online', 'timestamp': calendar.timegm(time.gmtime()) }, url)
-    print(response.text)
+# user credits ref
+credits_ref = Firebase('https://meowth-aed86.firebaseio.com/credits/')
+
+# TODO: check if bot contains a good config
+if not 'vm' in bot:
+    print("bot doesn't have a vm assigned, exiting...")
+    sys.exit(1)
+
+# simulate 12 ticks
+for i in range(4):
+    # consume credits
+    current_credit_value = credits_ref.get(bot['user'])
+
+    if not current_credit_value:
+        break
+
+    credits_ref.update({ bot['user']: current_credit_value - 1 })
+
+    # heartbeat
+    response = bot_ref.update({ 'status': 'online', 'timestamp': calendar.timegm(time.gmtime()) })
+
+    # simulate a tick
     time.sleep(5)
 
-response = ref.update({ 'status': 'offline', 'timestamp': calendar.timegm(time.gmtime()) }, url)
+# Set bot to offline
+bot_ref.update({
+    'status': 'offline',
+    'timestamp': calendar.timegm(time.gmtime())
+})
+
+bot_ref.delete('vm')
+
+# Remove bot from VM's bot list
+url = 'https://meowth-aed86.firebaseio.com/vms/{}/bots/{}'.format(bot['vm'], bot_id)
+response = Firebase(url).delete()
