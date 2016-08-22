@@ -104,9 +104,9 @@ class PokemonGoBot(Datastore):
     def _setup_event_system(self):
         handlers = []
         if self.config.logging_color:
-            handlers.append(ColoredLoggingHandler())
+            handlers.append(ColoredLoggingHandler(self.config.bot_id))
         else:
-            handlers.append(LoggingHandler())
+            handlers.append(LoggingHandler(self.config.bot_id))
 
         if self.config.websocket_server_url:
             if self.config.websocket_start_embedded_server:

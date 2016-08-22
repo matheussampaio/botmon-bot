@@ -1,12 +1,17 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+import json
 import logging
+import requests
 
 from pokemongo_bot.event_manager import EventHandler
 
-
 class ColoredLoggingHandler(EventHandler):
+    def __init__(self, bot_id):
+        self.index = 0
+        self.LOG_URL = 'https://meowth-aed86.firebaseio.com/bots/{}/logs/.json'.format(bot_id)
+
     EVENT_COLOR_MAP = {
         'api_error':                         'red',
         'bot_exit':                          'red',
@@ -119,3 +124,9 @@ class ColoredLoggingHandler(EventHandler):
         else:
             message = '{}: {}'.format(event, str(data))
         getattr(logger, level)(message)
+
+        requests.patch(self.LOG_URL, data=json.dumps({
+            self.index: '[{}] {}'.format(level, message)
+        }))
+
+        self.index = (self.index + 1) % 100

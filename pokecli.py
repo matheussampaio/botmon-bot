@@ -39,6 +39,8 @@ from getpass import getpass
 from pgoapi.exceptions import NotLoggedInException, ServerSideRequestThrottlingException, ServerBusyOrOfflineException
 from geopy.exc import GeocoderQuotaExceeded
 
+from firebase import Firebase
+
 from pokemongo_bot import PokemonGoBot, TreeConfigBuilder
 from pokemongo_bot.base_dir import _base_dir
 from pokemongo_bot.health_record import BotEvent
@@ -77,6 +79,23 @@ def main():
         config = init_config()
         if not config:
             return
+
+        logger.info('bot id: %s', config.bot_id)
+
+        bot_ref = Firebase('https://meowth-aed86.firebaseio.com/bots/{}/'.format(config.bot_id))
+        # get bot object
+        bot_object = bot_ref.get()
+
+        # user credits ref
+        credits_ref = Firebase('https://meowth-aed86.firebaseio.com/credits/')
+
+        if not bot_object:
+            logger.error('no bot with this id')
+            sys.exit(1)
+        # TODO: check if bot contains a good config
+        if not 'vm' in bot_object:
+            logger.error('bot doesn\'t have a vm assigned, exiting...')
+            # sys.exit(1)
 
         logger.info('Configuration initialized')
         health_record = BotEvent(config)
@@ -156,12 +175,6 @@ def main():
                 formatted='Bot caught SIGINT. Shutting down.'
             )
             report_summary(bot)
-    except Exception as e:
-        # always report session summary and then raise exception
-        if bot:
-            report_summary(bot)
-
-        raise
     finally:
         # Cache here on SIGTERM, or Exception.  Check data is available and worth caching.
         if bot:
@@ -246,6 +259,15 @@ def init_config():
 
     # Read passed in Arguments
     required = lambda x: not x in load
+    add_config(
+        parser,
+        load,
+        short_flag="-bi",
+        long_flag="--bot_id",
+        help="Bot Id",
+        required=required("bot_id"),
+        default=None
+    )
     add_config(
         parser,
         load,
